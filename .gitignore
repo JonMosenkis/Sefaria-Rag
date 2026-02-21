@@ -1,0 +1,8 @@
+.env
+chunks.db
+__pycache__/
+*.pyc
+.venv/
+.vscode/
+.idea/
+qdrant_storage/
