@@ -1,10 +1,10 @@
 import os
 
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import Depends, FastAPI, HTTPException, Query
 from dotenv import load_dotenv
 
 from app.models import SearchResponse, SearchHit
-from app.search import search
+from app.search import SearchService, build_search_service
 
 load_dotenv()
 
@@ -12,10 +12,14 @@ app = FastAPI(title="Sefaria RAG", version="0.1.0")
 
 
 @app.get("/search", response_model=SearchResponse)
-def search_endpoint(q: str = Query(..., min_length=2), limit: int = 5):
+def search_endpoint(
+    q: str = Query(..., min_length=2),
+    limit: int = 5,
+    search_service: SearchService = Depends(build_search_service),
+):
     if limit < 1 or limit > 50:
         raise HTTPException(status_code=400, detail="limit must be between 1 and 50")
-    hits_raw = search(q, limit=limit)
+    hits_raw = search_service.search(q, limit=limit)
     hits = [SearchHit(**hit) for hit in hits_raw]
     return SearchResponse(query=q, hits=hits)
 

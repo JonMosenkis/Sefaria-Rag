@@ -1,13 +1,21 @@
 import argparse
 import os
+import time
 from typing import List
 
 from dotenv import load_dotenv
-from openai import OpenAI
 from qdrant_client import QdrantClient
 from qdrant_client.models import Distance, PointStruct, VectorParams
 
-from app.db import get_conn, init_db, list_unembedded, mark_embedded
+from app.clients import get_openai_client
+from app.db import (
+    count_chunks,
+    count_embedded,
+    get_conn,
+    init_db,
+    list_unembedded,
+    mark_embedded,
+)
 
 
 def ensure_collection(client: QdrantClient, name: str, vector_size: int) -> None:
@@ -19,8 +27,11 @@ def ensure_collection(client: QdrantClient, name: str, vector_size: int) -> None
     )
 
 
-def embed_batch(client: OpenAI, model: str, texts: List[str]) -> List[List[float]]:
+def embed_batch(client, model: str, texts: List[str]) -> List[List[float]]:
+    start = time.time()
     response = client.embeddings.create(model=model, input=texts, encoding_format="float")
+    elapsed = time.time() - start
+    print(f"Embedded batch of {len(texts)} in {elapsed:.2f}s")
     return [item.embedding for item in response.data]
 
 
@@ -45,14 +56,25 @@ def main() -> None:
     conn = get_conn(args.db_path)
     init_db(conn)
 
-    oa_client = OpenAI()
+    oa_client = get_openai_client()
     q_client = QdrantClient(url=args.qdrant_url)
 
+    total = 0
+    batch_num = 0
+    total_chunks = count_chunks(conn)
+    embedded_count = count_embedded(conn)
+    print(f"Total chunks: {total_chunks} (already embedded: {embedded_count})")
     while True:
         rows = list_unembedded(conn, args.batch_size)
         if not rows:
             break
 
+        batch_num += 1
+        remaining = total_chunks - embedded_count - total
+        print(
+            f"Batch {batch_num}: embedding {len(rows)} chunks "
+            f"(remaining: {max(remaining, 0)})"
+        )
         texts = [row["text"] for row in rows]
         embeddings = embed_batch(oa_client, args.model, texts)
         ensure_collection(q_client, args.collection, len(embeddings[0]))
@@ -73,8 +95,10 @@ def main() -> None:
 
         q_client.upsert(collection_name=args.collection, points=points)
         mark_embedded(conn, [row["id"] for row in rows])
+        total += len(rows)
+        print(f"Batch {batch_num} complete (total embedded: {total})")
 
-    print("Embedding complete")
+    print(f"Embedding complete (total embedded: {total})")
 
 
 if __name__ == "__main__":

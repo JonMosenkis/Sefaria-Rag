@@ -4,3 +4,4 @@ qdrant-client
 openai
 python-dotenv
 pydantic
+requests

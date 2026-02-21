@@ -50,6 +50,18 @@ def list_unembedded(conn: sqlite3.Connection, limit: int) -> List[sqlite3.Row]:
     return cur.fetchall()
 
 
+def count_chunks(conn: sqlite3.Connection) -> int:
+    cur = conn.execute("SELECT COUNT(*) AS count FROM chunks")
+    row = cur.fetchone()
+    return int(row["count"]) if row else 0
+
+
+def count_embedded(conn: sqlite3.Connection) -> int:
+    cur = conn.execute("SELECT COUNT(*) AS count FROM chunks WHERE embedded = 1")
+    row = cur.fetchone()
+    return int(row["count"]) if row else 0
+
+
 def mark_embedded(conn: sqlite3.Connection, ids: Iterable[int]) -> None:
     ids = list(ids)
     if not ids:

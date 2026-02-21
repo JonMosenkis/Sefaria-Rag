@@ -6,3 +6,6 @@ __pycache__/
 .vscode/
 .idea/
 qdrant_storage/
+*.db
+data
+scripts/
